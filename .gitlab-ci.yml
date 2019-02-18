@@ -1,0 +1,17 @@
+---
+
+stages:
+  - build
+
+build-chart:
+  stage: build
+  image:
+    name: registry.example.com/helm
+    entrypoint: [""]
+  script:
+    - helm package --version=${CI_COMMIT_REF_NAME} ./${CI_PROJECT_NAME}
+    - helm lint --strict ${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}.tgz
+    - curl --silent --data-binary "@${CI_PROJECT_NAME}-${CI_COMMIT_REF_NAME}.tgz" --write-out "\n" https://charts.example.com/api/charts
+  tags:
+    - docker
+    - builder

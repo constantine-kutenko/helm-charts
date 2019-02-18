@@ -1,0 +1,222 @@
+---
+
+registry_address: registry.example.com
+revisionHistoryLimit: 4
+locale: baremetal
+environment: development
+location: local
+domain_name: ""
+tags:
+  bare_metal: true
+interface:
+  primary:
+    internal: ""
+    external: ""
+  secondary:
+    internal: ""
+    external: ""
+env:
+  CONFD_BACKEND: ""
+  CONFD_BACKEND_OPTS: ""
+pvc:
+  class_name: nfs
+  pvc_name: freeswitch
+
+kamailio:
+  replicaCount: 1
+  image:
+    name: voice-kamailio
+  env:
+    primary:
+      KAMAILIO_LISTEN_ADDRESS: ""
+      MYSQL_DBHOST: ""
+      MYSQL_DBPORT: "3306"
+    secondary:
+      KAMAILIO_LISTEN_ADDRESS: ""
+      MYSQL_DBHOST: ""
+      MYSQL_DBPORT: "3306"
+
+rtpengine:
+  image:
+    name: rtpengine
+    tag: latest
+  env:
+    RTPENGINE_LISTEN_NG: "true"
+    RTPENGINE_NG_IP: "127.0.0.1"
+    primary:
+      RTPENGINE_INTERFACE_INTERNAL: ""
+      RTPENGINE_INTERFACE_EXTERNAL: ""
+    secondary:
+      RTPENGINE_INTERFACE_INTERNAL: ""
+      RTPENGINE_INTERFACE_EXTERNAL: ""
+    RTPENGINE_AMQP_HOST: ""
+    RTPENGINE_AMQP_PORT: "15672"
+    RTPENGINE_AMQP_USERNAME: ""
+    RTPENGINE_AMQP_PASSWORD: ""
+    RTPENGINE_AMQP_VHOST_NAME: ""
+    RTPENGINE_AMQP_EXCHANGE_NAME: "eventRtpengine"
+    RTPENGINE_AMQP_KEY_NAME: "rtpengine"
+    RTPENGINE_KERNEL_MODULE: "true"
+    RTPENGINE_TABLE_ID: "0"
+    SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/ZXCVBNM/ASDFGHJKL/QWERTYUIOP"
+  init:
+    image:
+      name: rtpengine-init
+      tag: latest
+
+mysql:
+  replicaCount: 1
+  image:
+    name: mysql
+    tag: 5.7-centos-repl
+  storage:
+    rootPath: /var/lib/mysql
+  env:
+    primary:
+      MYSQL_BIND_ADDRESS: ""
+    secondary:
+      MYSQL_BIND_ADDRESS: ""
+  probe:
+    user: ""
+    password: ""
+
+mysqljob:
+  image:
+    name: mysql-client
+    tag: latest
+  env:
+    MYSQL_HOSTS: ""
+    MYSQL_PORT: "3306"
+    MYSQL_USERNAME: ""
+    MYSQL_PASSWORD: ""
+    SLACK_WEBHOOK_URL: ""
+  schedule: ""
+  failedJobsHistoryLimit: 1
+  successfulJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  restartPolicy: Never
+
+redis:
+  image:
+    name: redis
+    tag: latest
+
+freeswitch:
+  replicaCount: 2
+  image:
+    name: voice-freeswitch
+  env:
+    FREESWITCH_AMQP_HOST: ""
+    FREESWITCH_AMQP_PORT: "15672"
+    FREESWITCH_AMQP_USERNAME: ""
+    FREESWITCH_AMQP_PASSWORD: ""
+    FREESWITCH_AMQP_VHOST_NAME: ""
+    FREESWITCH_AMQP_EXCHANGE_NAME: "FS.kube"
+    FREESWITCH_AMQP_KEY_NAME: "freeswitch"
+  service:
+    type: ClusterIP
+
+callcontrol:
+  image:
+    name: voice-callcontrol
+
+eventbroadcast:
+  image:
+    name: voice-eventbroadcast
+
+ac_audio_manager:
+  replicaCount: 2
+  image:
+    name: voice-ac-audio-manager
+
+vm_audio_manager:
+  replicaCount: 2
+  image:
+    name: voice-vm-audio-manager
+
+callflowmanager:
+  replicaCount: 2
+  image:
+    name: voice-callflowmanager
+  service:
+    type: ClusterIP
+    port: 80
+
+callapi:
+  replicaCount: 2
+  image:
+    name: voice-callapi
+  service:
+    type: ClusterIP
+    port: 80
+
+ac_manager:
+  replicaCount: 2
+  image:
+    name: voice-ac-manager
+  service:
+    type: ClusterIP
+    port: 80
+
+queryhandler:
+  replicaCount: 2
+  image:
+    name: voice-queryhandler
+  service:
+    type: ClusterIP
+    port: 80
+
+websocket_callmonitor:
+  replicaCount: 2
+  image:
+    name: voice-websocket-callmonitor
+  service:
+    type: ClusterIP
+    port: 80
+
+billing_api:
+  replicaCount: 2
+  image:
+    name: voice-billing-api
+  service:
+    type: ClusterIP
+    port: 80
+
+dialler:
+  replicaCount: 2
+  image:
+    name: voice-dialler
+  service:
+    type: ClusterIP
+    port: 80
+
+billing_cron:
+  replicaCount: 2
+  image:
+    name: voice-billing-cron
+  service:
+    type: ClusterIP
+    port: 80
+
+device_manager:
+  replicaCount: 2
+  image:
+    name: voice-device-manager
+
+glusterfs:
+  service:
+    type: ClusterIP
+    port: 24007
+  endpoints:
+    ips:
+      - localhost
+
+mysql_local:
+  service:
+    type: ClusterIP
+    port: 3306
+    externalName: ""
+  endpoints:
+    ips:
+      - localhost
+    port: mysql

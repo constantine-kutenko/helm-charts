@@ -1,0 +1,31 @@
+---
+
+registry_address: library
+revisionHistoryLimit: 3
+image:
+  name: traefik
+  tag: alpine
+env:
+  ETCD_SERVERS: ""
+  RFC2136_TSIG_KEY: ""
+  RFC2136_NAMESERVER: ""
+  RFC2136_TSIG_ALGORITHM: "hmac-sha256."
+  RFC2136_TSIG_SECRET: ""
+traefik:
+  args:
+    authBasicUsers: ""
+kube_dns:
+  service:
+    ip: ""
+ingress:
+  annotations:
+    ingress.kubernetes.io/redirect-entry-point: https
+    ingress.kubernetes.io/redirect-permanent: "true"
+    kubernetes.io/ingress.class: traefik
+  path: /
+  hosts: []
+service:
+  http:
+    nodePort: ""
+  https:
+    nodePort: ""

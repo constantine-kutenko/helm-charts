@@ -1,0 +1,82 @@
+---
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Chart.Name }}
+  namespace: kube-system
+  labels:
+    k8s-app: {{ .Chart.Name }}
+spec:
+  selector:
+    matchLabels:
+      k8s-app: {{ .Chart.Name }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  template:
+    metadata:
+      labels:
+        k8s-app: {{ .Chart.Name }}
+    spec:
+      serviceAccountName: {{ .Chart.Name }}
+      terminationGracePeriodSeconds: 240
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.registry_address }}/{{ .Values.image.name }}:{{ .Chart.AppVersion }}"
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--defaultentrypoints=http,https"
+            - "--entryPoints=Name:http Address::80 Compress:true"
+            - "--entryPoints=Name:https Address::443 TLS Compress:true"
+            - "--entryPoints=Name:api Address::8080"
+            - "--api"
+            - "--api.dashboard"
+            - "--api.entrypoint=api"
+            - "--api.statistics"
+            - "--etcd"
+            - "--etcd.endpoint={{ .Values.env.ETCD_SERVERS }}"
+            - "--etcd.trace"
+            - "--etcd.watch"
+            - "--etcd.useapiv3"
+            - "--etcd.prefix=/traefik"
+            - "--kubernetes"
+            - "--kubernetes.watch"
+            - "--acme"
+            - "--acme.dnschallenge.provider=rfc2136"
+            - "--acme.email=support@example.com"
+            - "--acme.storage=/traefik/acme/account"
+            - "--acme.entrypoint=https"
+            - "--acme.acmelogging"
+            - "--acme.dnschallenge"
+            - "--acme.dnschallenge.delaybeforecheck=3"
+            - "--acme.onhostrule"
+            - "--loglevel=INFO"
+            - "--ping"
+            - "--ping.entrypoint=api"
+          env:
+            - name: RFC2136_TSIG_KEY
+              value: "{{ .Values.env.RFC2136_TSIG_KEY }}"
+            - name: RFC2136_NAMESERVER
+              value: "{{ .Values.env.RFC2136_NAMESERVER }}"
+            - name: RFC2136_TSIG_ALGORITHM
+              value: "{{ .Values.env.RFC2136_TSIG_ALGORITHM }}"
+            - name: RFC2136_TSIG_SECRET
+              value: "{{ .Values.env.RFC2136_TSIG_SECRET }}"
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: https
+              containerPort: 443
+              protocol: TCP
+            - name: api
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: api
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+  updateStrategy:
+    type: RollingUpdate

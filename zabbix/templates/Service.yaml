@@ -1,0 +1,38 @@
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: zabbix-server
+  labels:
+    app: zabbix
+    tier: server
+spec:
+  type: {{ .Values.zabbix_server.service.type }}
+  ports:
+    - name: zabbix
+      port: {{ .Values.zabbix_server.service.port }}
+      targetPort: zabbix
+      protocol: TCP
+  selector:
+    app: zabbix
+    name: zabbix-server
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: zabbix-frontend
+  labels:
+    app: zabbix
+    tier: frontend
+spec:
+  type: {{ .Values.zabbix_frontend.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.zabbix_frontend.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: zabbix
+    name: zabbix-frontend

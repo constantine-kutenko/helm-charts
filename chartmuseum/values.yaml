@@ -1,0 +1,22 @@
+---
+
+registry_address: registry.example.com
+replicaCount: 1
+location: ""
+image:
+  name: chartmuseum
+service:
+  type: ClusterIP
+pvc:
+  class_name: nfs
+  access_modes: 
+    - ReadWriteMany
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    ingress.kubernetes.io/redirect-entry-point: https
+    ingress.kubernetes.io/redirect-permanent: "true"
+  path: /
+  hosts:
+    - chartmuseum.localhost

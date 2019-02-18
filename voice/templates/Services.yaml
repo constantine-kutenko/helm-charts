@@ -1,0 +1,180 @@
+---
+
+#
+#
+#
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: freeswitch
+spec:
+  type: {{ .Values.freeswitch.service.type }}
+  clusterIP: None
+  ports:
+    - name: sip-tcp
+      port: 5060
+      targetPort: 5060
+      protocol: TCP
+    - name: sip-udp
+      port: 5060
+      targetPort: 5060
+      protocol: UDP
+  selector:
+    app: freeswitch
+---
+
+#
+#
+#
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: callflowmanager
+spec:
+  type: {{ .Values.callflowmanager.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.callflowmanager.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: callflowmanager
+---
+
+#
+#
+#
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: callapi
+spec:
+  type: {{ .Values.callapi.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.callapi.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: callapi
+---
+
+#
+#
+#
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ac-manager
+spec:
+  type: {{ .Values.ac_manager.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.ac_manager.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: ac-manager
+---
+
+#
+#
+#
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: queryhandler
+spec:
+  type: {{ .Values.queryhandler.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.queryhandler.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: queryhandler
+---
+
+#
+#
+#
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: websocket-callmonitor
+spec:
+  type: {{ .Values.websocket_callmonitor.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.websocket_callmonitor.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: websocket-callmonitor
+---
+
+#
+#
+#
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: billing-api
+spec:
+  type: {{ .Values.billing_api.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.billing_api.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: billing-api
+---
+
+#
+#
+#
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: billing-cron
+spec:
+  type: {{ .Values.billing_cron.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.billing_cron.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: billing-cron
+
+---
+
+#
+# DB service is supposed to be external and does not have a selector - please look at ./Endpoints.yaml
+#
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-local
+spec:
+  {{- if .Values.tags.bare_metal }}
+  type: {{ .Values.mysql_local.service.type }}
+  ports:
+    - name: mysql
+      port: {{ .Values.mysql_local.service.port }}
+      targetPort: mysql
+      protocol: TCP
+  {{- else }}
+  type: ExternalName
+  externalName: {{ .Values.mysql_local.service.externalName }}
+  {{- end }}

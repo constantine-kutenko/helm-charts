@@ -1,0 +1,27 @@
+---
+{{- if .Values.confluence.ingress.enabled -}}
+{{- $ingressPath := .Values.confluence.ingress.path -}}
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ .Chart.Name }}
+{{- with .Values.confluence.ingress.annotations }}
+  annotations:
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  rules:
+  {{- range .Values.confluence.ingress.hosts }}
+    - host: {{ . }}
+      http:
+        paths:
+          - path: {{ $ingressPath }}
+            backend:
+              serviceName: confluence
+              servicePort: http
+          - path: /synchrony
+            backend:
+              serviceName: confluence
+              servicePort: synchrony
+  {{- end }}
+{{- end }}

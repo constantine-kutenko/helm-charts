@@ -1,0 +1,23 @@
+---
+{{- if .Values.zabbix_frontend.ingress.enabled -}}
+{{- $ingressPath := .Values.zabbix_frontend.ingress.path -}}
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: zabbix-frontend
+{{- with .Values.zabbix_frontend.ingress.annotations }}
+  annotations:
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  rules:
+  {{- range .Values.zabbix_frontend.ingress.hosts }}
+    - host: {{ . }}
+      http:
+        paths:
+          - path: {{ $ingressPath }}
+            backend:
+              serviceName: zabbix-frontend
+              servicePort: http
+  {{- end }}
+{{- end }}

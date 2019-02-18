@@ -1,0 +1,15 @@
+---
+
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: synthesis
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "2"
+        memory: 512Mi
+      defaultRequest:
+        cpu: 10m
+        memory: 16Mi

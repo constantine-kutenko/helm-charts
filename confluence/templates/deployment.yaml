@@ -1,0 +1,74 @@
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}
+spec:
+  replicas: {{ .Values.confluence.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.registry_address }}/{{ .Values.confluence.image.name }}:{{ .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.confluence.image.pullPolicy }}
+          env:
+            - name: CONFLUENCE_DATABASE_TYPE
+              value: "{{ .Values.confluence.env.CONFLUENCE_DATABASE_TYPE }}"
+            - name: CONFLUENCE_DATABASE_NAME
+              value: "{{ .Values.confluence.env.CONFLUENCE_DATABASE_NAME }}"
+            - name: CONFLUENCE_DATABASE_USER
+              value: "{{ .Values.confluence.env.CONFLUENCE_DATABASE_USER }}"
+            - name: CONFLUENCE_DATABASE_PASSWORD
+              value: "{{ .Values.confluence.env.CONFLUENCE_DATABASE_PASSWORD }}"
+            - name: CONFLUENCE_DATABASE_SCHEMA
+              value: "{{ .Values.confluence.env.CONFLUENCE_DATABASE_SCHEMA }}"
+            - name: TOMCAT_PROXY_ENABLED
+              value: "{{ .Values.confluence.env.TOMCAT_PROXY_ENABLED }}"
+            - name: TOMCAT_PROXY_NAME
+              value: "{{ .Values.confluence.env.TOMCAT_PROXY_NAME }}"
+            - name: TOMCAT_PROXY_PORT
+              value: "{{ .Values.confluence.env.TOMCAT_PROXY_PORT }}"
+            - name: TOMCAT_PROXY_SCHEME
+              value: "{{ .Values.confluence.env.TOMCAT_PROXY_SCHEME }}"
+            - name: CONFLUENCE_JAVA_XMS
+              value: "{{ .Values.confluence.env.CONFLUENCE_JAVA_XMS }}"
+            - name: CONFLUENCE_JAVA_XMX
+              value: "{{ .Values.confluence.env.CONFLUENCE_JAVA_XMX }}"
+          ports:
+            - name: http
+              containerPort: 8090
+              protocol: TCP
+          livenessProbe:
+            initialDelaySeconds: 250
+            periodSeconds: 60
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 15
+            tcpSocket:
+              port: http
+          readinessProbe:
+            initialDelaySeconds: 250
+            periodSeconds: 60
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 15
+            httpGet:
+              path: /
+              port: http
+          volumeMounts:
+            - name: confluence
+              mountPath: /var/lib/confluence
+      volumes:
+        - name: confluence
+          glusterfs:
+            endpoints: crossdc-glusterfs
+            path: confluence

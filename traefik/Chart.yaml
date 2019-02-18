@@ -1,0 +1,18 @@
+---
+
+
+name: traefik
+apiVersion: v1
+appVersion: 1.7.1
+description: Træfik is a modern HTTP reverse proxy and load balancer
+home: https://traefik.io/
+icon: https://docs.traefik.io/img/traefik.logo.png
+keywords:
+  - traefik
+  - ingress
+maintainers:
+  - name: Maintainer
+    email: support@example.com
+    url: https://www.example.com
+sources:
+  - https://github.com/containous/traefik

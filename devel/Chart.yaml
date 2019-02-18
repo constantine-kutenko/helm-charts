@@ -1,0 +1,6 @@
+---
+
+name: devel
+apiVersion: v1
+appVersion: 0.0.1
+description: Devel Helm chart for Kubernetes

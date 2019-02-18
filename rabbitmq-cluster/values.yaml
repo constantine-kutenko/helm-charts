@@ -1,0 +1,49 @@
+---
+
+registry_address: registry.example.com
+replicaCount: 3
+location: "local"
+image:
+  name: rabbitmq
+env:
+  RABBITMQ_ERLANG_COOKIE: ""
+  RABBITMQ_PLUGINS: "rabbitmq_management"
+  RABBITMQ_DATA_DIR: /var/lib/rabbitmq/mnesia
+  RABBITMQ_MNESIA_BASE: /var/lib/rabbitmq/mnesia
+  RABBITMQ_PLUGINS_EXPAND_DIR: /opt/rabbitmq/plugins-expand
+  RABBITMQ_DOMAIN_POSTFIX: "local"
+service:
+  type: ClusterIP
+  protocol: TCP
+  loadBalancerIP: ""
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    ingress.kubernetes.io/redirect-entry-point: https
+    ingress.kubernetes.io/redirect-permanent: "true"
+  path: /
+  hosts:
+    - localhost
+config:
+  default_user: guest
+  default_pass: guest
+  vm_memory_high_watermark_relative: 0.6
+  logging:
+    logdir: ""
+    logfile: false
+    loglevel: error
+    logconsole: true
+    logconsolelevel: error
+    logfederationfile: ""
+  etcd:
+    host: ""
+    port: 2379
+    scheme: "http"
+    key_prefix: ""
+definitions:
+  cluster_name: ""
+pvc:
+  class_name: nfs
+  access_modes: 
+    - ReadWriteMany

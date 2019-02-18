@@ -1,0 +1,7 @@
+---
+
+name: zabbix
+apiVersion: v1
+appVersion: "3.4"
+description: Zabbix monitoring system
+home: https://www.zabbix.org/

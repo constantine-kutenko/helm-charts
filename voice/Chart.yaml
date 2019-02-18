@@ -1,0 +1,47 @@
+---
+
+#
+#
+#
+
+name: voice
+apiVersion: v1
+description: Voice applications
+home: https://www.example.com
+icon: https://www.example.com/images/logo.png
+keywords:
+  - kamailio
+  - freeswitch
+  - eventbroadcast
+  - queryhandler
+  - callflowmanager
+  - billing-api
+  - dialler
+  - callapi
+  - billing-cron
+  - web-socket-callmonitor
+  - callcontrol
+  - ac-manager
+  - rtpengine
+  - queuemanager
+  - ac-audio-manager
+maintainers:
+  - name: Maintainer
+    email: support@example.com
+    url: https://www.example.com
+sources:
+  - https://gitlab.example.com/voice/kamailio
+  - https://gitlab.example.com/voice/freeswitch
+  - https://gitlab.example.com/voice/eventbroadcast
+  - https://gitlab.example.com/voice/queryhandler
+  - https://gitlab.example.com/voice/callflowmanager
+  - https://gitlab.example.com/voice/billing-api
+  - https://gitlab.example.com/voice/dialler
+  - https://gitlab.example.com/voice/callapi
+  - https://gitlab.example.com/voice/billing-cron
+  - https://gitlab.example.com/voice/websocket-callmonitor
+  - https://gitlab.example.com/voice/callcontrol
+  - https://gitlab.example.com/voice/ac-manager
+  - https://gitlab.example.com/voice/rtpengine
+  - https://gitlab.example.com/voice/queuemanager
+  - https://gitlab.example.com/voice/ac-audio-manager

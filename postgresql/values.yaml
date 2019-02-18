@@ -1,0 +1,18 @@
+registry_address: registry.example.com
+revisionHistoryLimit: 3
+
+postgresql:
+  replicaCount: 1
+  image:
+    name: postgresql
+    tag: 10.3-centos
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 5432
+  storage:
+    rootPath: /srv/fast_storage
+    mountPath: /var/lib/pgsql/10/data
+  volumes:
+      path: '{{ .Values.postgresql.storage.rootPath }}/{{ .Release.Name }}/pgsql/{{ printf "%.2s" .Values.postgresql.image.tag }}'
+  matchExpressionKey: kubernetes.io/zabbix-database

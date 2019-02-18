@@ -1,0 +1,19 @@
+---
+
+registry_address: registry.example.com
+revisionHistoryLimit: 3
+environment: development
+location: local
+replicaCount: 1
+image:
+  name: mongodb
+env:
+  MONGODB_LISTEN_ADDRESS: "0.0.0.0"
+  MONGODB_LISTEN_PORT: "27017"
+  MONGODB_DATA_DIR: "/var/lib/mongodb"
+service:
+  type: ClusterIP
+  protocol: TCP
+  port: 27017
+pvc:
+  class_name: nfs

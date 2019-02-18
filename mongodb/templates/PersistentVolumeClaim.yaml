@@ -1,0 +1,13 @@
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-{{ .Values.environment }}
+spec:
+  storageClassName: {{ .Values.pvc.class_name }}
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi 

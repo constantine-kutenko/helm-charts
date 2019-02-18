@@ -1,0 +1,6 @@
+---
+
+name: chartmuseum
+apiVersion: v1
+appVersion: 0.7.1
+description: Helm Chart Repository

@@ -1,0 +1,1273 @@
+---
+
+{{- $mysql_primary := .Values.mysql.env.primary.MYSQL_BIND_ADDRESS }}
+{{- $mysql_secondary := .Values.mysql.env.secondary.MYSQL_BIND_ADDRESS }}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kamailio-primary
+spec:
+  replicas: {{ .Values.kamailio.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: kamailio-primary
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  template:
+    metadata:
+      labels:
+        app: kamailio-primary
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/voip
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/voip
+          operator: Exists
+          effect: NoExecute
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/kamailio-primary
+                  operator: In
+                  values: ["true"]
+                - key: kubernetes.io/environment
+                  operator: In
+                  values: ["{{ .Values.environment }}"]
+      hostNetwork: true
+      initContainers:
+        - name: rtpengine-init
+          image: "{{ .Values.registry_address }}/{{ .Values.rtpengine.init.image.name }}:{{ .Values.rtpengine.init.image.tag }}"
+          securityContext:
+            capabilities:
+              add: ["ALL"]
+              privileged: true
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: kamailio-primary
+          image: "{{ .Values.registry_address }}/{{ .Values.kamailio.image.name }}:{{ .Values.kamailio.image.tag | default .Values.environment }}"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+            - name: CONFD_BACKEND
+              value: "{{ .Values.env.CONFD_BACKEND }}"
+            - name: CONFD_BACKEND_OPTS
+              value: "{{ .Values.env.CONFD_BACKEND_OPTS }}"
+            - name: KAMAILIO_LISTEN_ADDRESS
+              value: "{{ .Values.kamailio.env.primary.KAMAILIO_LISTEN_ADDRESS }}"
+            - name: INTERFACE_INTERNAL
+              value: "{{ .Values.interface.primary.internal }}"
+            - name: INTERFACE_EXTERNAL
+              value: "{{ .Values.interface.primary.external }}"
+            - name: KAMAILIO_SHARED_MEMORY
+              value: "256"
+            - name: MYSQL_DBHOST
+              value: "{{ .Values.kamailio.env.primary.MYSQL_DBHOST }}"
+            - name: MYSQL_DBPORT
+              value: "{{ .Values.kamailio.env.primary.MYSQL_DBPORT }}"
+            {{- if not .Values.tags.bare_metal }}
+            - name: MYSQL_LOCAL_SERVICE_HOST
+              value: "{{ .Values.mysql_local.service.externalName }}"
+            - name: MYSQL_LOCAL_SERVICE_PORT
+              value: "{{ .Values.mysql_local.service.port }}"
+            {{- end }}
+          {{- if eq .Values.environment "development" }}
+          securityContext:
+            capabilities:
+              add: ["NET_RAW", "NET_ADMIN"]
+          {{- end }}
+          resources:
+            limits:
+              cpu: "2"
+              memory: "2.5Gi"
+            requests:
+              cpu: "1"
+              memory: "1Gi"
+          livenessProbe:
+            tcpSocket:
+              port: 5060
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+              - kamctl
+              - uptime
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 5
+        - name: rtpengine
+          image: "{{ .Values.registry_address }}/{{ .Values.rtpengine.image.name }}:{{ .Values.rtpengine.image.tag }}"
+          lifecycle:
+            postStart:
+              exec:
+                command: [
+                  "/bin/bash",
+                  "-c",
+                  "curl -i -u ${RTPENGINE_AMQP_USERNAME}:${RTPENGINE_AMQP_PASSWORD} http://${RTPENGINE_AMQP_HOST}:${RTPENGINE_AMQP_PORT}/api/exchanges/${RTPENGINE_AMQP_VHOST_NAME}/${RTPENGINE_AMQP_EXCHANGE_NAME}/publish -d '{\"properties\":{},\"routing_key\":\"'${RTPENGINE_AMQP_KEY_NAME}'\",\"payload\":\"{\\\"Event-Category\\\":\\\"INTERNAL\\\",\\\"Event-Name\\\":\\\"rtpStarted\\\",\\\"Rtpengine-IP\\\":\\\"'${RTPENGINE_POD_ADDRESS}'\\\"}\",\"payload_encoding\":\"string\"}'"
+                ]
+            preStop:
+              exec:
+                command: [
+                  "/bin/bash",
+                  "-c",
+                  "curl -i -u ${RTPENGINE_AMQP_USERNAME}:${RTPENGINE_AMQP_PASSWORD} http://${RTPENGINE_AMQP_HOST}:${RTPENGINE_AMQP_PORT}/api/exchanges/${RTPENGINE_AMQP_VHOST_NAME}/${RTPENGINE_AMQP_EXCHANGE_NAME}/publish -d '{\"properties\":{},\"routing_key\":\"'${RTPENGINE_AMQP_KEY_NAME}'\",\"payload\":\"{\\\"Event-Category\\\":\\\"INTERNAL\\\",\\\"Event-Name\\\":\\\"rtpEnding\\\",\\\"Rtpengine-IP\\\":\\\"'${RTPENGINE_POD_ADDRESS}'\\\"}\",\"payload_encoding\":\"string\"}'"
+                ]
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+            - name: RTPENGINE_INTERFACE
+              value: "{{ .Values.rtpengine.env.RTPENGINE_INTERFACE }}"
+            - name: RTPENGINE_LISTEN_NG
+              value: "{{ .Values.rtpengine.env.RTPENGINE_LISTEN_NG }}"
+            - name: RTPENGINE_NG_IP
+              value: "{{ .Values.rtpengine.env.RTPENGINE_NG_IP }}"
+            - name: RTPENGINE_INTERFACE_INTERNAL
+              value: "{{ .Values.rtpengine.env.primary.RTPENGINE_INTERFACE_INTERNAL }}"
+            - name: RTPENGINE_INTERFACE_EXTERNAL
+              value: "{{ .Values.rtpengine.env.primary.RTPENGINE_INTERFACE_EXTERNAL }}"
+            - name: RTPENGINE_AMQP_HOST
+              value: "{{ .Values.rtpengine.env.RTPENGINE_AMQP_HOST }}"
+            - name: RTPENGINE_AMQP_PORT
+              value: "{{ .Values.rtpengine.env.RTPENGINE_AMQP_PORT }}"
+            - name: RTPENGINE_AMQP_USERNAME
+              value: "{{ .Values.rtpengine.env.RTPENGINE_AMQP_USERNAME }}"
+            - name: RTPENGINE_AMQP_PASSWORD
+              value: "{{ .Values.rtpengine.env.RTPENGINE_AMQP_PASSWORD }}"
+            - name: RTPENGINE_AMQP_VHOST_NAME
+              value: "synthesis-{{ .Values.environment }}"
+            - name: RTPENGINE_AMQP_EXCHANGE_NAME
+              value: "{{ .Values.rtpengine.env.RTPENGINE_AMQP_EXCHANGE_NAME }}"
+            - name: RTPENGINE_AMQP_KEY_NAME
+              value: "{{ .Values.rtpengine.env.RTPENGINE_AMQP_KEY_NAME }}"
+            - name: RTPENGINE_POD_ADDRESS
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: RTPENGINE_KERNEL_MODULE
+              value: "{{ .Values.rtpengine.env.RTPENGINE_KERNEL_MODULE }}"
+            - name: RTPENGINE_TABLE_ID
+              value: "{{ .Values.rtpengine.env.RTPENGINE_TABLE_ID }}"
+            - name: SLACK_WEBHOOK_URL
+              value: "{{ .Values.rtpengine.env.SLACK_WEBHOOK_URL }}"
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
+        - name: redis
+          image: "{{ .Values.registry_address }}/{{ .Values.redis.image.name }}:{{ .Values.redis.image.tag }}"
+          args:
+            - "--bind"
+            - "127.0.0.1"
+            - "--daemonize"
+            - "no"
+            - "--protected-mode"
+            - "no"
+            - "--loglevel"
+            - "notice"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+          livenessProbe:
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+            tcpSocket:
+              host: "127.0.0.1"
+              port: 6379
+          readinessProbe:
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+              - redis-cli
+              - ping
+      dnsPolicy: ClusterFirstWithHostNet
+---
+
+#
+#
+#
+
+{{- if .Values.tags.bare_metal }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-master-01
+spec:
+  replicas: {{ .Values.mysql.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mysql-master-01
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  template:
+    metadata:
+      labels:
+        app: mysql-master-01
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/voip
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/voip
+          operator: Exists
+          effect: NoExecute
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/kamailio-primary
+                  operator: In
+                  values: ["true"]
+                - key: kubernetes.io/environment
+                  operator: In
+                  values: ["{{ .Values.environment }}"]
+      hostNetwork: true
+      containers:
+        - name: mysql-master-01
+          image: "{{ .Values.registry_address }}/{{ .Values.mysql.image.name }}:{{ .Values.mysql.image.tag }}"
+          args:
+            - "mysqld"
+            - "--bind-address={{ $mysql_primary }}"
+            - "--port=3306"
+            - "--skip-name-resolve"
+            - "--datadir=/var/lib/mysql/data"
+            - "--server-id=1"
+            - "--user=mysql"
+            - "--log_slave_updates=1"
+            - "--max_binlog_size=100M"
+            - "--expire_logs_days=10"
+            - "--relay-log-index=/var/lib/mysql/log/mysql-relay-bin.index"
+            - "--relay-log=/var/lib/mysql/log/mysql-relay-bin"
+            - "--log_bin_index=/var/lib/mysql/log/mysql-bin.log.index"
+            - "--log-bin=/var/lib/mysql/log/mysql-bin.log"
+            - "--auto-increment-increment=2"
+            - "--auto-increment-offset=1"
+            - "--binlog-ignore-db=sys"
+            - "--binlog-ignore-db=mysql"
+            - "--binlog-ignore-db=performance_schema"
+            - "--binlog-ignore-db=information_schema"
+            - "--explicit_defaults_for_timestamp=1"
+            - "--console"
+            - "--log-error=/var/log/mysqld.log"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: mysql
+              containerPort: 3306
+              protocol: TCP
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+          livenessProbe:
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 60
+            periodSeconds: 60
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+                - mysql
+                - -u{{ .Values.mysql.probe.user }}
+                - -p{{ .Values.mysql.probe.password }}
+                - -e
+                - "select 1"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+      dnsPolicy: ClusterFirstWithHostNet
+      volumes:
+        - name: mysql-data
+          hostPath:
+            path: {{ .Values.mysql.storage.rootPath }}
+{{- end }}
+---
+
+#
+#
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kamailio-secondary
+spec:
+  replicas: {{ .Values.kamailio.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: kamailio-secondary
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  template:
+    metadata:
+      labels:
+        app: kamailio-secondary
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/voip
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/voip
+          operator: Exists
+          effect: NoExecute
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/kamailio-secondary
+                  operator: In
+                  values: ["true"]
+                - key: kubernetes.io/environment
+                  operator: In
+                  values: ["{{ .Values.environment }}"]
+      hostNetwork: true
+      initContainers:
+        - name: rtpengine-init
+          image: "{{ .Values.registry_address }}/{{ .Values.rtpengine.init.image.name }}:{{ .Values.rtpengine.init.image.tag }}"
+          securityContext:
+            capabilities:
+              add: ["ALL"]
+              privileged: true
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: kamailio-secondary
+          image: "{{ .Values.registry_address }}/{{ .Values.kamailio.image.name }}:{{ .Values.kamailio.image.tag | default .Values.environment }}"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"  
+            - name: CONFD_BACKEND
+              value: "{{ .Values.env.CONFD_BACKEND }}"
+            - name: CONFD_BACKEND_OPTS
+              value: "{{ .Values.env.CONFD_BACKEND_OPTS }}"
+            - name: KAMAILIO_LISTEN_ADDRESS
+              value: "{{ .Values.kamailio.env.secondary.KAMAILIO_LISTEN_ADDRESS }}"
+            - name: INTERFACE_INTERNAL
+              value: "{{ .Values.interface.secondary.internal }}"
+            - name: INTERFACE_EXTERNAL
+              value: "{{ .Values.interface.secondary.external }}"
+            - name: KAMAILIO_SHARED_MEMORY
+              value: "256"
+            - name: MYSQL_DBHOST
+              value: "{{ .Values.kamailio.env.secondary.MYSQL_DBHOST }}"
+            - name: MYSQL_DBPORT
+              value: "{{ .Values.kamailio.env.secondary.MYSQL_DBPORT }}"
+            {{- if not .Values.tags.bare_metal }}
+            - name: MYSQL_LOCAL_SERVICE_HOST
+              value: "{{ .Values.mysql_local.service.externalName }}"
+            - name: MYSQL_LOCAL_SERVICE_PORT
+              value: "{{ .Values.mysql_local.service.port }}"
+            {{- end }}
+          {{- if eq .Values.environment "development" }}
+          securityContext:
+            capabilities:
+              add: ["NET_RAW", "NET_ADMIN"]
+          {{- end }}
+          resources:
+            limits:
+              cpu: "2"
+              memory: "2.5Gi"
+            requests:
+              cpu: "1"
+              memory: "1Gi"
+          livenessProbe:
+            tcpSocket:
+              port: 5060
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+              - kamctl
+              - uptime
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 5
+        - name: rtpengine
+          image: "{{ .Values.registry_address }}/{{ .Values.rtpengine.image.name }}:{{ .Values.rtpengine.image.tag | default .Values.environment }}"
+          lifecycle:
+            postStart:
+              exec:
+                command: [
+                  "/bin/bash",
+                  "-c",
+                  "curl -i -u ${RTPENGINE_AMQP_USERNAME}:${RTPENGINE_AMQP_PASSWORD} http://${RTPENGINE_AMQP_HOST}:${RTPENGINE_AMQP_PORT}/api/exchanges/${RTPENGINE_AMQP_VHOST_NAME}/${RTPENGINE_AMQP_EXCHANGE_NAME}/publish -d '{\"properties\":{},\"routing_key\":\"'${RTPENGINE_AMQP_KEY_NAME}'\",\"payload\":\"{\\\"Event-Category\\\":\\\"INTERNAL\\\",\\\"Event-Name\\\":\\\"rtpStarted\\\",\\\"Rtpengine-IP\\\":\\\"'${RTPENGINE_POD_ADDRESS}'\\\"}\",\"payload_encoding\":\"string\"}'"
+                ]
+            preStop:
+              exec:
+                command: [
+                  "/bin/bash",
+                  "-c",
+                  "curl -i -u ${RTPENGINE_AMQP_USERNAME}:${RTPENGINE_AMQP_PASSWORD} http://${RTPENGINE_AMQP_HOST}:${RTPENGINE_AMQP_PORT}/api/exchanges/${RTPENGINE_AMQP_VHOST_NAME}/${RTPENGINE_AMQP_EXCHANGE_NAME}/publish -d '{\"properties\":{},\"routing_key\":\"'${RTPENGINE_AMQP_KEY_NAME}'\",\"payload\":\"{\\\"Event-Category\\\":\\\"INTERNAL\\\",\\\"Event-Name\\\":\\\"rtpEnding\\\",\\\"Rtpengine-IP\\\":\\\"'${RTPENGINE_POD_ADDRESS}'\\\"}\",\"payload_encoding\":\"string\"}'"
+                ]
+          env:
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+            - name: RTPENGINE_INTERFACE
+              value: "{{ .Values.rtpengine.env.RTPENGINE_INTERFACE }}"
+            - name: RTPENGINE_LISTEN_NG
+              value: "{{ .Values.rtpengine.env.RTPENGINE_LISTEN_NG }}"
+            - name: RTPENGINE_NG_IP
+              value: "{{ .Values.rtpengine.env.RTPENGINE_NG_IP }}"
+            - name: RTPENGINE_INTERFACE_INTERNAL
+              value: "{{ .Values.rtpengine.env.secondary.RTPENGINE_INTERFACE_INTERNAL }}"
+            - name: RTPENGINE_INTERFACE_EXTERNAL
+              value: "{{ .Values.rtpengine.env.secondary.RTPENGINE_INTERFACE_EXTERNAL }}"
+            - name: RTPENGINE_AMQP_HOST
+              value: "{{ .Values.rtpengine.env.RTPENGINE_AMQP_HOST }}"
+            - name: RTPENGINE_AMQP_PORT
+              value: "{{ .Values.rtpengine.env.RTPENGINE_AMQP_PORT }}"
+            - name: RTPENGINE_AMQP_USERNAME
+              value: "{{ .Values.rtpengine.env.RTPENGINE_AMQP_USERNAME }}"
+            - name: RTPENGINE_AMQP_PASSWORD
+              value: "{{ .Values.rtpengine.env.RTPENGINE_AMQP_PASSWORD }}"
+            - name: RTPENGINE_AMQP_VHOST_NAME
+              value: "synthesis-{{ .Values.environment }}"
+            - name: RTPENGINE_AMQP_EXCHANGE_NAME
+              value: "{{ .Values.rtpengine.env.RTPENGINE_AMQP_EXCHANGE_NAME }}"
+            - name: RTPENGINE_AMQP_KEY_NAME
+              value: "{{ .Values.rtpengine.env.RTPENGINE_AMQP_KEY_NAME }}"
+            - name: RTPENGINE_POD_ADDRESS
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: RTPENGINE_KERNEL_MODULE
+              value: "{{ .Values.rtpengine.env.RTPENGINE_KERNEL_MODULE }}"
+            - name: RTPENGINE_TABLE_ID
+              value: "{{ .Values.rtpengine.env.RTPENGINE_TABLE_ID }}"
+            - name: SLACK_WEBHOOK_URL
+              value: "{{ .Values.rtpengine.env.SLACK_WEBHOOK_URL }}"
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
+        - name: redis
+          image: "{{ .Values.registry_address }}/{{ .Values.redis.image.name }}:{{ .Values.redis.image.tag }}"
+          args:
+            - "--bind"
+            - "127.0.0.1"
+            - "--daemonize"
+            - "no"
+            - "--protected-mode"
+            - "no"
+            - "--loglevel"
+            - "notice"
+          ports:
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+          livenessProbe:
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+            tcpSocket:
+              host: "127.0.0.1"
+              port: 6379
+          readinessProbe:
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+              - redis-cli
+              - ping
+      dnsPolicy: ClusterFirstWithHostNet
+      volumes:
+        - name: mysql-data
+          hostPath:
+            path: {{ .Values.mysql.storage.rootPath }}
+---
+
+#
+#
+#
+
+{{- if .Values.tags.bare_metal }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-master-02
+spec:
+  replicas: {{ .Values.mysql.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mysql-master-02
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  template:
+    metadata:
+      labels:
+        app: mysql-master-02
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/voip
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/voip
+          operator: Exists
+          effect: NoExecute
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/kamailio-secondary
+                  operator: In
+                  values: ["true"]
+                - key: kubernetes.io/environment
+                  operator: In
+                  values: ["{{ .Values.environment }}"]
+      hostNetwork: true
+      containers:
+        - name: mysql-master-02
+          image: "{{ .Values.registry_address }}/{{ .Values.mysql.image.name }}:{{ .Values.mysql.image.tag }}"
+          args:
+            - "mysqld"
+            - "--bind-address={{ $mysql_secondary }}"
+            - "--port=3306"
+            - "--skip-name-resolve"
+            - "--datadir=/var/lib/mysql/data"
+            - "--server-id=2"
+            - "--user=mysql"
+            - "--log_slave_updates=1"
+            - "--max_binlog_size=100M"
+            - "--expire_logs_days=10"
+            - "--relay-log-index=/var/lib/mysql/log/mysql-relay-bin.index"
+            - "--relay-log=/var/lib/mysql/log/mysql-relay-bin"
+            - "--log_bin_index=/var/lib/mysql/log/mysql-bin.log.index"
+            - "--log-bin=/var/lib/mysql/log/mysql-bin.log"
+            - "--auto-increment-increment=2"
+            - "--auto-increment-offset=2"
+            - "--binlog-ignore-db=sys"
+            - "--binlog-ignore-db=mysql"
+            - "--binlog-ignore-db=performance_schema"
+            - "--binlog-ignore-db=information_schema"
+            - "--explicit_defaults_for_timestamp=1"
+            - "--console"
+            - "--log-error=/var/log/mysqld.log"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: mysql
+              containerPort: 3306
+              protocol: TCP
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+          livenessProbe:
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 60
+            periodSeconds: 60
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+                - mysql
+                - -u{{ .Values.mysql.probe.user }}
+                - -p{{ .Values.mysql.probe.password }}
+                - -e
+                - "select 1"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+      dnsPolicy: ClusterFirstWithHostNet
+      volumes:
+        - name: mysql-data
+          hostPath:
+            path: {{ .Values.mysql.storage.rootPath }}
+{{- end }}
+---
+
+#
+#
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: freeswitch
+spec:
+  replicas: {{ .Values.freeswitch.replicaCount }}
+  selector:
+    matchLabels:
+      app: freeswitch
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  template:
+    metadata:
+      labels:
+        app: freeswitch
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: freeswitch
+          image: "{{ .Values.registry_address }}/{{ .Values.freeswitch.image.name }}:{{ .Values.freeswitch.image.tag | default .Values.environment }}"
+          lifecycle:
+            postStart:
+              exec:
+                command: [
+                  "/bin/bash",
+                  "-c",
+                  "curl -i -u ${FREESWITCH_AMQP_USERNAME}:${FREESWITCH_AMQP_PASSWORD} http://${FREESWITCH_AMQP_HOST}:${FREESWITCH_AMQP_PORT}/api/exchanges/${FREESWITCH_AMQP_VHOST_NAME}/${FREESWITCH_AMQP_EXCHANGE_NAME}/publish -d '{\"properties\":{},\"routing_key\":\"'${FREESWITCH_AMQP_KEY_NAME}'\",\"payload\":\"{\\\"Event-Category\\\":\\\"INTERNAL\\\",\\\"Event-Name\\\":\\\"fs_start\\\",\\\"Freeswitch-IP\\\":\\\"'${FREESWITCH_POD_ADDRESS}'\\\"}\",\"payload_encoding\":\"string\"}'"
+                ]
+            preStop:
+              exec:
+                command: [
+                  "/bin/bash",
+                  "-c",
+                  "curl -i -u ${FREESWITCH_AMQP_USERNAME}:${FREESWITCH_AMQP_PASSWORD} http://${FREESWITCH_AMQP_HOST}:${FREESWITCH_AMQP_PORT}/api/exchanges/${FREESWITCH_AMQP_VHOST_NAME}/${FREESWITCH_AMQP_EXCHANGE_NAME}/publish -d '{\"properties\":{},\"routing_key\":\"'${FREESWITCH_AMQP_KEY_NAME}'\",\"payload\":\"{\\\"Event-Category\\\":\\\"INTERNAL\\\",\\\"Event-Name\\\":\\\"fs_stop\\\",\\\"Freeswitch-IP\\\":\\\"'${FREESWITCH_POD_ADDRESS}'\\\"}\",\"payload_encoding\":\"string\"}'"
+                ]
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+            - name: CONFD_BACKEND
+              value: "{{ .Values.env.CONFD_BACKEND }}"
+            - name: CONFD_BACKEND_OPTS
+              value: "{{ .Values.env.CONFD_BACKEND_OPTS }}"
+            - name: FREESWITCH_AMQP_HOST
+              value: "{{ .Values.freeswitch.env.FREESWITCH_AMQP_HOST }}"
+            - name: FREESWITCH_AMQP_PORT
+              value: "{{ .Values.freeswitch.env.FREESWITCH_AMQP_PORT }}"
+            - name: FREESWITCH_AMQP_USERNAME
+              value: "{{ .Values.freeswitch.env.FREESWITCH_AMQP_USERNAME }}"
+            - name: FREESWITCH_AMQP_PASSWORD
+              value: "{{ .Values.freeswitch.env.FREESWITCH_AMQP_PASSWORD }}"
+            - name: FREESWITCH_AMQP_VHOST_NAME
+              value: "synthesis-{{ .Values.environment }}"
+            - name: FREESWITCH_AMQP_EXCHANGE_NAME
+              value: "{{ .Values.freeswitch.env.FREESWITCH_AMQP_EXCHANGE_NAME }}"
+            - name: FREESWITCH_AMQP_KEY_NAME
+              value: "{{ .Values.freeswitch.env.FREESWITCH_AMQP_KEY_NAME }}"
+            - name: FREESWITCH_POD_ADDRESS
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          {{- if eq .Values.environment "development" }}
+          securityContext:
+            capabilities:
+              add: ["SYS_NICE", "NET_RAW", "NET_ADMIN"]
+          {{- end }}
+          volumeMounts:
+            - name: audio
+              mountPath: /var/lib/freeswitch/audio
+          livenessProbe:
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 5
+            tcpSocket:
+              port: 5060
+          readinessProbe:
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+              - fs_cli
+              - -H
+              - "127.0.0.1"
+              - --connect-timeout
+              - "2400"
+              - -x
+              - status
+        - name: callcontrol
+          image: "{{ .Values.registry_address }}/{{ .Values.callcontrol.image.name }}:{{ .Values.callcontrol.image.tag | default .Values.environment }}"
+          args:
+            - "--healthchecksPort=3002"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: healthz
+              containerPort: 3002
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz/liveness
+              port: healthz
+            initialDelaySeconds: 10
+            periodSeconds: 10
+        - name: eventbroadcast
+          image: "{{ .Values.registry_address }}/{{ .Values.eventbroadcast.image.name }}:{{ .Values.eventbroadcast.image.tag | default .Values.environment }}"
+          args:
+            - "--healthchecksPort=3004"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: healthz
+              containerPort: 3004
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz/liveness
+              port: healthz
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: audio
+          persistentVolumeClaim:
+            claimName: freeswitch-{{ .Values.environment }}
+---
+
+#
+#
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ac-audio-manager
+  labels:
+    app: ac-audio-manager
+spec:
+  replicas: {{ .Values.ac_audio_manager.replicaCount }}
+  selector:
+    matchLabels:
+      app: ac-audio-manager
+  template:
+    metadata:
+      labels:
+        app: ac-audio-manager
+    spec:
+      containers:
+        - name: ac-audio-manager
+          image: "{{ .Values.registry_address }}/{{ .Values.ac_audio_manager.image.name }}:{{ .Values.ac_audio_manager.image.tag | default .Values.environment }}"
+          args:
+            - "start"
+            - "--healthchecksPort=3000"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: healthz
+              containerPort: 3000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz/liveness
+              port: healthz
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+            requests:
+              cpu: "128m"
+              memory: "128Mi"
+          volumeMounts:
+            - name: audio
+              mountPath: /var/lib/ac-audio-manager
+      volumes:
+        - name: audio
+          persistentVolumeClaim:
+            claimName: freeswitch-{{ .Values.environment }}
+---
+
+#
+#
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: callflowmanager
+spec:
+  replicas: {{ .Values.callflowmanager.replicaCount }}
+  selector:
+    matchLabels:
+      app: callflowmanager
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  template:
+    metadata:
+      labels:
+        app: callflowmanager
+    spec:
+      containers:
+        - name: callflowmanager
+          image: "{{ .Values.registry_address }}/{{ .Values.callflowmanager.image.name }}:{{ .Values.callflowmanager.image.tag | default .Values.environment }}"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+---
+
+#
+#
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: callapi
+spec:
+  replicas: {{ .Values.callapi.replicaCount }}
+  selector:
+    matchLabels:
+      app: callapi
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  template:
+    metadata:
+      labels:
+        app: callapi
+    spec:
+      containers:
+        - name: callapi
+          image: "{{ .Values.registry_address }}/{{ .Values.callapi.image.name }}:{{ .Values.callapi.image.tag | default .Values.environment }}"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+---
+
+#
+#
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ac-manager
+spec:
+  replicas: {{ .Values.ac_manager.replicaCount }}
+  selector:
+    matchLabels:
+      app: ac-manager
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  template:
+    metadata:
+      labels:
+        app: ac-manager
+    spec:
+      containers:
+        - name: ac-manager
+          image: "{{ .Values.registry_address }}/{{ .Values.ac_manager.image.name }}:{{ .Values.ac_manager.image.tag | default .Values.environment }}"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+---
+
+#
+#
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queryhandler
+spec:
+  replicas: {{ .Values.queryhandler.replicaCount }}
+  selector:
+    matchLabels:
+      app: queryhandler
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  template:
+    metadata:
+      labels:
+        app: queryhandler
+    spec:
+      containers:
+        - name: queryhandler
+          image: "{{ .Values.registry_address }}/{{ .Values.queryhandler.image.name }}:{{ .Values.queryhandler.image.tag | default .Values.environment }}"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+---
+
+#
+#
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: websocket-callmonitor
+spec:
+  replicas: {{ .Values.websocket_callmonitor.replicaCount }}
+  selector:
+    matchLabels:
+      app: websocket-callmonitor
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  template:
+    metadata:
+      labels:
+        app: websocket-callmonitor
+    spec:
+      containers:
+        - name: websocket-callmonitor
+          image: "{{ .Values.registry_address }}/{{ .Values.websocket_callmonitor.image.name }}:{{ .Values.websocket_callmonitor.image.tag | default .Values.environment }}"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+---
+
+#
+#
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: billing-api
+spec:
+  replicas: {{ .Values.billing_api.replicaCount }}
+  selector:
+    matchLabels:
+      app: billing-api
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  template:
+    metadata:
+      labels:
+        app: billing-api
+    spec:
+      containers:
+        - name: billing-api
+          image: "{{ .Values.registry_address }}/{{ .Values.billing_api.image.name }}:{{ .Values.billing_api.image.tag | default .Values.environment }}"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+---
+
+#
+#
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dialler
+spec:
+  replicas: {{ .Values.dialler.replicaCount }}
+  selector:
+    matchLabels:
+      app: dialler
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  template:
+    metadata:
+      labels:
+        app: dialler
+    spec:
+      containers:
+        - name: dialler
+          image: "{{ .Values.registry_address }}/{{ .Values.dialler.image.name }}:{{ .Values.dialler.image.tag | default .Values.environment }}"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+---
+
+#
+#
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: billing-cron
+spec:
+  replicas: {{ .Values.billing_cron.replicaCount }}
+  selector:
+    matchLabels:
+      app: billing-cron
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  template:
+    metadata:
+      labels:
+        app: billing-cron
+    spec:
+      containers:
+        - name: billing-cron
+          image: "{{ .Values.registry_address }}/{{ .Values.billing_cron.image.name }}:{{ .Values.billing_cron.image.tag | default .Values.environment }}"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+---
+
+#
+#
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vm-audio-manager
+  labels:
+    app: vm-audio-manager
+spec:
+  replicas: {{ .Values.vm_audio_manager.replicaCount }}
+  selector:
+    matchLabels:
+      app: vm-audio-manager
+  template:
+    metadata:
+      labels:
+        app: vm-audio-manager
+    spec:
+      containers:
+        - name: vm-audio-manager
+          image: "{{ .Values.registry_address }}/{{ .Values.vm_audio_manager.image.name }}:{{ .Values.vm_audio_manager.image.tag | default .Values.environment }}"
+          args:
+            - "start"
+            - "--healthchecksPort=3000"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: healthz
+              containerPort: 3000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz/liveness
+              port: healthz
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+            requests:
+              cpu: "128m"
+              memory: "128Mi"
+          volumeMounts:
+            - name: audio
+              mountPath: /tmp/voicemail
+      volumes:
+        - name: audio
+          persistentVolumeClaim:
+            claimName: freeswitch-{{ .Values.environment }}
+---
+
+#
+#
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: device-manager
+  labels:
+    app: device-manager
+spec:
+  replicas: {{ .Values.vm_audio_manager.replicaCount }}
+  selector:
+    matchLabels:
+      app: device-manager
+  template:
+    metadata:
+      labels:
+        app: device-manager
+    spec:
+      containers:
+        - name: device-manager
+          image: "{{ .Values.registry_address }}/{{ .Values.device_manager.image.name }}:{{ .Values.device_manager.image.tag | default .Values.environment }}"
+          args:
+            - "start"
+            - "--healthchecksPort=3000"
+          env:
+            - name: LOCALE
+              value: "{{ .Values.locale }}"
+            - name: LOCATION
+              value: "{{ .Values.location }}"
+            - name: NODE_ENV
+              value: "{{ .Values.environment }}"
+            - name: DOMAIN_NAME
+              value: "{{ .Values.domain_name }}"
+          ports:
+            - name: healthz
+              containerPort: 3000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz/liveness
+              port: healthz
+            initialDelaySeconds: 10
+            periodSeconds: 10

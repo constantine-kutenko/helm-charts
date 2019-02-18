@@ -1,0 +1,10 @@
+---
+
+#
+#
+#
+
+dependencies:
+  - name: redis
+    version: 0.1.2
+    repository: https://charts.example.com/

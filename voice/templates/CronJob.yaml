@@ -1,0 +1,47 @@
+{{- if .Values.tags.bare_metal }}
+---
+
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: mysql-replication-monitor
+spec:
+  concurrencyPolicy: {{ .Values.mysqljob.concurrencyPolicy }}
+  failedJobsHistoryLimit: {{ .Values.mysqljob.failedJobsHistoryLimit }}
+  schedule: "{{ .Values.mysqljob.schedule }}"
+  successfulJobsHistoryLimit: {{ .Values.mysqljob.successfulJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app:  mysql-replication-monitor
+            cron:  mysql--replication-monitor
+        spec:
+          restartPolicy: {{ .Values.mysqljob.restartPolicy }}
+          hostNetwork: true
+          containers:
+            - name: mysql-client
+              image: "{{ .Values.registry_address }}/{{ .Values.mysqljob.image.name }}:{{ .Values.mysqljob.image.tag }}"
+              env:
+                - name: LOCATION
+                  value: "{{ .Values.location }}"
+                - name: NODE_ENV
+                  value: "{{ .Values.environment }}"
+                - name: DOMAIN_NAME
+                  value: "{{ .Values.domain_name }}"
+                - name: MYSQL_HOSTS
+                  value: "{{ .Values.mysqljob.env.MYSQL_HOST }}"
+                - name: MYSQL_PORT
+                  value: "{{ .Values.mysqljob.env.MYSQL_PORT }}"
+                - name: MYSQL_USERNAME
+                  value: "{{ .Values.mysqljob.env.MYSQL_USERNAME }}"
+                - name: MYSQL_PASSWORD
+                  value: "{{ .Values.mysqljob.env.MYSQL_PASSWORD }}"
+                - name: SLACK_WEBHOOK_URL
+                  value: "{{ .Values.mysqljob.env.SLACK_WEBHOOK_URL }}"
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+{{- end }}

@@ -1,0 +1,6 @@
+---
+
+name: jira
+apiVersion: v1
+appVersion: 7.12.2
+description: A Helm chart for Atlassian Jira

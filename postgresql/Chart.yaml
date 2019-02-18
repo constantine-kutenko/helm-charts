@@ -1,0 +1,8 @@
+---
+
+name: postgresql
+apiVersion: v1
+appVersion: "10.3"
+description: PostgreSQL database engine
+home: https://www.postgresql.org/
+icon: https://www.postgresql.org/media/img/about/press/elephant.png

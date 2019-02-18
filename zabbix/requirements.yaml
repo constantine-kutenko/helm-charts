@@ -1,0 +1,6 @@
+---
+
+dependencies:
+  - name: postgresql
+    version: "0.0.4"
+    repository: https://charts.example.com/

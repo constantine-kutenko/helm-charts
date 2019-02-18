@@ -1,0 +1,32 @@
+{{- if .Values.tags.bare_metal }}
+---
+
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: glusterfs
+subsets:
+- addresses:
+{{- range .Values.glusterfs.endpoints.ips }}
+      - ip: {{ . }}
+{{- end }}
+  ports:
+    - name: glusterd
+      port: 24007
+      protocol: TCP
+---
+
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: mysql-local
+subsets:
+  - addresses:
+{{- range .Values.mysql_local.endpoints.ips }}
+      - ip: {{ . }}
+{{- end }}
+    ports:
+      - name: mysql
+        port: 3306
+        protocol: TCP
+{{- end }}

@@ -1,0 +1,16 @@
+---
+
+registry_address: docker.io
+revisionHistoryLimit: 3
+image:
+  name: traefik
+env:
+  ETCD_SERVERS: ""
+  RFC2136_TSIG_KEY: ""
+  RFC2136_NAMESERVER: ""
+  RFC2136_TSIG_ALGORITHM: "hmac-sha256."
+  RFC2136_TSIG_SECRET: ""
+service:
+  type: LoadBalancer
+  protocol: TCP
+  loadBalancerIP: 127.0.0.1

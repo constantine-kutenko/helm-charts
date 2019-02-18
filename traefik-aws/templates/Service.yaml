@@ -1,0 +1,39 @@
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  type: NodePort
+  externalTrafficPolicy: Cluster
+  selector:
+    name: traefik
+  ports:
+  - name: http
+    nodePort: {{ .Values.service.http.nodePort }}
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  - name: https
+    nodePort: {{ .Values.service.https.nodePort }}
+    port: 443
+    targetPort: 443
+    protocol: TCP
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-web-ui
+  namespace: kube-system
+spec:
+  type: ClusterIP
+  selector:
+    name: traefik
+  ports:
+  - name: api
+    port: 80
+    targetPort: 8080
+    protocol: TCP

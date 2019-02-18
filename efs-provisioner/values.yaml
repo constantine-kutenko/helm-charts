@@ -1,0 +1,55 @@
+---
+
+registry_address: quay.io/external_storage
+replicaCount: 1
+revisionHistoryLimit: 3
+
+# Deploy environment label, e.g. dev, test, prod
+global:
+  deployEnv: dev
+
+# Containers
+image:
+  name: efs-provisioner
+  tag: v0.1.2
+  pullPolicy: IfNotPresent
+
+busyboxImage:
+  repository: gcr.io/google_containers/busybox
+  tag: 1.27
+  pullPolicy: IfNotPresent
+
+# Configure provisioner
+efsProvisioner:
+  efsFileSystemId: ""
+  awsRegion: ""
+  path: /example-pv
+  provisionerName: example.com/aws-efs
+  storageClass:
+    name: efs
+    isDefault: false
+    gidAllocate:
+      enabled: true
+      gidMin: 40000
+      gidMax: 50000
+    reclaimPolicy: Delete
+
+# Enable RBAC
+rbac:
+  create: true
+
+# Create or use ServiceAccount
+serviceAccount:
+  create: true
+  # The name of the ServiceAccount to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# Configure resources
+resources:
+  limits:
+    cpu: 300m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi

@@ -1,0 +1,19 @@
+---
+
+registry_address: registry.example.com
+replicaCount: 1
+
+image:
+  name: cfssl
+  tag: 1.3.2
+  pullPolicy: Always
+service:
+  type: ClusterIP
+  protocol: TCP
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: traefik
+  path: /
+  hosts:
+    - cfssl.localhost

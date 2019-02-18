@@ -1,0 +1,54 @@
+registry_address: registry.example.com
+revisionHistoryLimit: 1
+
+env:
+  ZABBIX_DATABASE_TYPE: "POSTGRESQL"
+  ZABBIX_DATABASE_NAME: "zabbix"
+  ZABBIX_DATABASE_USER: "zabbix"
+  ZABBIX_DATABASE_PASSWORD: "zabbix"
+  ZABBIX_DATABASE_SCHEMA: ""
+  PGDUMP_BACKUP_SERVER_ADDRESS: "minio.example.com"
+  PGDUMP_BACKUP_SERVER_BUCKET_NAME: "test"
+  PGDUMP_BACKUP_SERVER_ACCESS_KEY: ""
+  PGDUMP_BACKUP_SERVER_SECRET_KEY: ""
+
+job:
+  name: cronjob
+  image:
+    name: postgresql-pgdump
+    tag: 10.4-alpine
+    pullPolicy: Always
+  schedule: "0 23 * * 0"
+  failedJobsHistoryLimit: 1
+  successfulJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  restartPolicy: Never
+
+zabbix_frontend:
+  replicaCount: 1
+  image:
+    name: zabbix-frontend
+    tag: 3.4
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 80
+  ingress:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: traefik
+      ingress.kubernetes.io/redirect-entry-point: https
+      ingress.kubernetes.io/redirect-permanent: "true"
+    path: /
+    hosts:
+      - zabbix.localhost
+
+zabbix_server:
+  replicaCount: 1
+  image:
+    name: zabbix-server
+    tag: 3.4
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 10051

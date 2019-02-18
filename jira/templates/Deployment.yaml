@@ -1,0 +1,74 @@
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}
+spec:
+  replicas: {{ .Values.jira.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.registry_address }}/{{ .Values.jira.image.name }}:{{ .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.jira.image.pullPolicy }}
+          env:
+            - name: JIRA_DATABASE_TYPE
+              value: "{{ .Values.jira.env.JIRA_DATABASE_TYPE }}"
+            - name: JIRA_DATABASE_NAME
+              value: "{{ .Values.jira.env.JIRA_DATABASE_NAME }}"
+            - name: JIRA_DATABASE_USER
+              value: "{{ .Values.jira.env.JIRA_DATABASE_USER }}"
+            - name: JIRA_DATABASE_PASSWORD
+              value: "{{ .Values.jira.env.JIRA_DATABASE_PASSWORD }}"
+            - name: JIRA_DATABASE_SCHEMA
+              value: "{{ .Values.jira.env.JIRA_DATABASE_SCHEMA }}"
+            - name: TOMCAT_PROXY_ENABLED
+              value: "{{ .Values.jira.env.TOMCAT_PROXY_ENABLED }}"
+            - name: TOMCAT_PROXY_NAME
+              value: "{{ .Values.jira.env.TOMCAT_PROXY_NAME }}"
+            - name: TOMCAT_PROXY_PORT
+              value: "{{ .Values.jira.env.TOMCAT_PROXY_PORT }}"
+            - name: TOMCAT_PROXY_SCHEME
+              value: "{{ .Values.jira.env.TOMCAT_PROXY_SCHEME }}"
+            - name: JIRA_JAVA_XMS
+              value: "{{ .Values.jira.env.JIRA_JAVA_XMS }}"
+            - name: JIRA_JAVA_XMX
+              value: "{{ .Values.jira.env.JIRA_JAVA_XMX }}"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            initialDelaySeconds: 300
+            periodSeconds: 60
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 10
+            tcpSocket:
+              port: http
+          readinessProbe:
+            initialDelaySeconds: 300
+            periodSeconds: 60
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 10
+            httpGet:
+              path: /
+              port: http
+          volumeMounts:
+            - name: jira
+              mountPath: /var/lib/jira
+      volumes:
+        - name: jira
+          glusterfs:
+            endpoints: crossdc-glusterfs
+            path: jira

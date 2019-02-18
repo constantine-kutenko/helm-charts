@@ -1,0 +1,16 @@
+---
+
+name: efs-provisioner
+apiVersion: v1
+appVersion: v0.1.2
+description: A Helm chart for the AWS EFS external storage provisioner
+home: https://github.com/kubernetes-incubator/external-storage/tree/master/aws/efs
+keywords:
+  - aws
+  - efs
+  - efs-provisioner
+maintainers:
+  - name: Maintainer
+    email: support@example.com
+    url: https://www.example.com
+sources: []

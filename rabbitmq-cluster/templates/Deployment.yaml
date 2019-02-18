@@ -1,0 +1,116 @@
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Chart.Name }}
+spec:
+  serviceName: rabbitmq
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - {{ .Chart.Name }}
+              topologyKey: kubernetes.io/hostname
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: rabbit
+          image: "{{ .Values.registry_address }}/{{ .Values.image.name }}:{{ .Chart.AppVersion }}"
+          args:
+          env:
+            - name: RABBITMQ_ERLANG_COOKIE
+              value: "{{ .Values.env.RABBITMQ_ERLANG_COOKIE }}"
+            - name: RABBITMQ_PLUGINS
+              value: "{{ .Values.env.RABBITMQ_PLUGINS }}"
+            - name: RABBITMQ_MNESIA_BASE
+              value: "{{ .Values.env.RABBITMQ_MNESIA_BASE }}"
+            - name: RABBITMQ_PLUGINS_EXPAND_DIR
+              value: "{{ .Values.env.RABBITMQ_PLUGINS_EXPAND_DIR }}"
+            - name: RABBITMQ_DOMAIN_POSTFIX
+              value: "{{ .Values.env.RABBITMQ_DOMAIN_POSTFIX }}"
+            - name: RABBITMQ_USE_LONGNAME
+              value: "true"
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: RABBITMQ_NODENAME
+              value: rabbit@$(NODE_NAME).rabbitmq.default.svc.$(RABBITMQ_DOMAIN_POSTFIX)
+            - name: RABBITMQ_DATA_DIR
+              value: $(RABBITMQ_MNESIA_BASE)/rabbit\@$(NODE_NAME).rabbitmq.default.svc.$(RABBITMQ_DOMAIN_POSTFIX)
+          ports:
+            - name: amqp-tls
+              containerPort: 5671
+              protocol: TCP
+            - name: amqp
+              containerPort: 5672
+              protocol: TCP
+            - name: management
+              containerPort: 15672
+              protocol: TCP
+            - name: cluster
+              containerPort: 25672
+              protocol: TCP
+            - name: epmd
+              containerPort: 4369
+              protocol: TCP
+          resources:
+            limits:
+              cpu: "1"
+              memory: "1.5Gi"
+            requests:
+              cpu: "100m"
+              memory: "1Gi"
+          livenessProbe:
+            initialDelaySeconds: 240
+            periodSeconds: 30
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 15
+            exec:
+              command:
+              - epmd
+              - -names
+          readinessProbe:
+            initialDelaySeconds: 240
+            periodSeconds: 30
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 15
+            exec:
+              command:
+              - rabbitmqctl
+              - cluster_status
+          volumeMounts:
+            - name: rabbitmq-config-dir
+              mountPath: /etc/rabbitmq
+            - name: rabbitmq-cluster
+              mountPath: /var/lib/rabbitmq
+      volumes:
+        - name: rabbitmq-config-dir
+          configMap:
+             name: rabbitmq-config
+             items:
+              - key: definitions
+                path: definitions.json
+                defaultMode: 0644
+              - key: config
+                path: rabbitmq.conf
+                defaultMode: 0644
+        - name: {{ .Chart.Name }}
+          persistentVolumeClaim:
+            claimName: {{ .Chart.Name }}

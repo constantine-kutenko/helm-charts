@@ -1,0 +1,43 @@
+registry_address: registry.example.com
+revisionHistoryLimit: 3
+
+## Pod wide variables:
+confluence:
+  replicaCount: 1
+  image:
+    name: confluence
+    pullPolicy: Always
+  env:
+    CONFLUENCE_DATABASE_TYPE: "postgresql"
+    CONFLUENCE_DATABASE_NAME: "confluence"
+    CONFLUENCE_DATABASE_USER: "confluence"
+    CONFLUENCE_DATABASE_PASSWORD: ""
+    CONFLUENCE_DATABASE_SCHEMA: "public"
+    TOMCAT_PROXY_ENABLED: ""
+    TOMCAT_PROXY_NAME: ""
+    TOMCAT_PROXY_PORT: ""
+    TOMCAT_PROXY_SCHEME: ""
+    CONFLUENCE_JAVA_XMS: ""
+    CONFLUENCE_JAVA_XMX: ""
+  service:
+    type: ClusterIP
+    protocol: TCP
+  ingress:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: traefik
+      ingress.kubernetes.io/redirect-entry-point: https
+      ingress.kubernetes.io/redirect-permanent: "true"
+    path: /
+    hosts:
+      - localhost
+
+postgresql:
+  postgresql:
+    matchExpressionKey: "kubernetes.io/confluence-database"
+    image:
+      tag: 9.6
+    storage:
+      mountPath: /var/lib/pgsql/data
+    volumes:
+        path: /srv/fast_storage/confluence/pgsql/9.6

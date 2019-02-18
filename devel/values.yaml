@@ -1,0 +1,11 @@
+---
+
+
+registry_address: registry.example.com
+replicaCount: 1
+location: "local"
+image:
+  name: devel
+  tag: latest
+pvc:
+  class_name: nfs

@@ -1,0 +1,57 @@
+---
+
+registry_address: gitlab
+replicaCount: 1
+image:
+  name: gitlab-ce
+  tag: ""
+service:
+  type: ClusterIP
+env: []
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    ingress.kubernetes.io/redirect-entry-point: https
+    ingress.kubernetes.io/redirect-permanent: "true"
+    ingress.kubernetes.io/whitelist-source-range: "192.168.0.0/16, 10.0.0.0/8"
+  path: /
+  hosts:
+    - localhost
+config:
+  external_url: ""
+  pages_external_url: ""
+  nginx_listen_port: 80
+  nginx_listen_https: "false"
+  smtp_enable: "true"
+  smtp_address: ""
+  smtp_port: 25
+  smtp_authentication: "false"
+  smtp_enable_starttls_auto: "true"
+  smtp_ssl: true
+  smtp_force_ssl: true
+  email_from: ""
+  email_display_name: ""
+  email_reply_to: ""
+  prometheus_monitoring_enable: "false"
+  postgresql_enable: "false"
+  database_adapter: "postgres"
+  database_encoding: "unicode"
+  database_name: "gitlab"
+  database_pool: 10
+  database_host: ""
+  database_port: 5432
+  database_username: ""
+  database_password: ""
+affinity:
+  matchExpressionKey: kubernetes.io/gitlab-data
+storage:
+  rootPath: /srv/fast_storage/gitlab
+
+postgresql:
+  postgresql:
+    matchExpressionKey: kubernetes.io/gitlab-database
+    storage:
+      mountPath: /var/lib/pgsql/10/data
+    volumes:
+        path: /srv/fast_storage/gitlab-server/pgsql/10

@@ -1,0 +1,15 @@
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitlab-server
+spec:
+  storageClassName: {{ .Values.pvc.class_name }}
+  accessModes:
+  {{- range .Values.pvc.access_modes }}
+    - {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.pvc.storage_size }}

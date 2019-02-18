@@ -1,0 +1,22 @@
+---
+
+name: gitlab-server-aws
+apiVersion: v1
+appVersion: 11.5.0
+description: GitLab Server
+home: https://about.gitlab.com
+icon: https://gitlab.com/gitlab-com/gitlab-artwork/raw/master/logo/logo.jpg
+keywords:
+  - GitLab
+  - git
+  - ci
+  - deploy
+  - issue tracker
+  - code review
+  - wiki
+maintainers:
+  - name: Maintainer
+    email: support@example.com
+    url: https://www.example.com
+sources:
+  - https://gitlab.example.com/devops/helm-charts/gitlab-server

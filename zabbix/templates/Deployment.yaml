@@ -1,0 +1,92 @@
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zabbix-frontend
+  labels:
+    app: zabbix
+spec:
+  replicas: {{ .Values.zabbix_frontend.replicaCount }}
+  selector:
+    matchLabels:
+      name: zabbix-frontend
+      app: zabbix
+  template:
+    metadata:
+      labels:
+        name: zabbix-frontend
+        app: zabbix
+    spec:
+      containers:
+        - name: zabbix-frontend
+          image: "{{ .Values.registry_address }}/{{ .Values.zabbix_frontend.image.name }}:{{ .Values.zabbix_frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.zabbix_frontend.image.pullPolicy }}
+          env:
+            - name: ZABBIX_DATABASE_TYPE
+              value: "{{ .Values.env.ZABBIX_DATABASE_TYPE }}"
+            - name: ZABBIX_DATABASE_NAME
+              value: "{{ .Values.env.ZABBIX_DATABASE_NAME }}"
+            - name: ZABBIX_DATABASE_USER
+              value: "{{ .Values.env.ZABBIX_DATABASE_USER }}"
+            - name: ZABBIX_DATABASE_PASSWORD
+              value: "{{ .Values.env.ZABBIX_DATABASE_PASSWORD }}"
+            - name: ZABBIX_DATABASE_SCHEMA
+              value: "{{ .Values.env.ZABBIX_DATABASE_SCHEMA }}"
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 60
+            failureThreshold: 3
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zabbix-server
+  labels:
+    app: zabbix
+spec:
+  replicas: {{ .Values.zabbix_server.replicaCount }}
+  selector:
+    matchLabels:
+      name: zabbix-server
+      app: zabbix
+  template:
+    metadata:
+      labels:
+        name: zabbix-server
+        app: zabbix
+    spec:
+      hostNetwork: true
+      containers:
+        - name: zabbix-server
+          image: "{{ .Values.registry_address }}/{{ .Values.zabbix_server.image.name }}:{{ .Values.zabbix_server.image.tag }}"
+          imagePullPolicy: {{ .Values.zabbix_server.image.pullPolicy }}
+          env:
+            - name: ZABBIX_DATABASE_TYPE
+              value: "{{ .Values.env.ZABBIX_DATABASE_TYPE }}"
+            - name: ZABBIX_DATABASE_NAME
+              value: "{{ .Values.env.ZABBIX_DATABASE_NAME }}"
+            - name: ZABBIX_DATABASE_USER
+              value: "{{ .Values.env.ZABBIX_DATABASE_USER }}"
+            - name: ZABBIX_DATABASE_PASSWORD
+              value: "{{ .Values.env.ZABBIX_DATABASE_PASSWORD }}"
+            - name: ZABBIX_DATABASE_SCHEMA
+              value: "{{ .Values.env.ZABBIX_DATABASE_SCHEMA }}"
+          ports:
+            - name: zabbix
+              containerPort: 10051
+              protocol: TCP
+          livenessProbe:
+            tcpSocket: 
+              port: 10051
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            failureThreshold: 5

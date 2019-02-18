@@ -1,0 +1,189 @@
+---
+
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: gitlab-server
+  labels:
+    app: gitlab-server
+    tier: server
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: gitlab-server
+  template:
+    metadata:
+      labels:
+        app: gitlab-server
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: {{ .Values.affinity.matchExpressionKey }}
+                  operator: In
+                  values: ["true"]
+      strategy:
+        type: Recreate
+      containers:
+        - name: gitlab-server
+          image: "{{ .Values.registry_address }}/{{ .Values.image.name }}:{{ .Chart.AppVersion }}-ce.0"
+          env:
+            - name: GITLAB_EXTERNAL_URL
+              value: "{{ .Values.config.external_url }}"
+            - name: GITLAB_PAGES_EXTERNAL_URL
+              value: "{{ .Values.config.pages_external_url }}"
+            - name: GITLAB_NGINX_LISTEN_PORT
+              value: "{{ .Values.config.nginx_listen_port }}"
+            - name: GITLAB_NGINX_LISTEN_HTTPS
+              value: "{{ .Values.config.nginx_listen_https }}"
+            - name: GITLAB_SMTP_ENABLE
+              value: "{{ .Values.config.smtp_enable }}"
+            - name: GITLAB_SMTP_ADDRESS
+              value: "{{ .Values.config.smtp_address }}"
+            - name: GITLAB_SMTP_PORT
+              value: "{{ .Values.config.smtp_port }}"
+            - name: GITLAB_SMTP_AUTH
+              value: "{{ .Values.config.smtp_authentication }}"
+            - name: GITLAB_SMTP_ENABLE_STARTTLS
+              value: "{{ .Values.config.smtp_enable_starttls_auto }}"
+            - name: GITLAB_SMTP_SSL
+              value: "{{ .Values.config.smtp_ssl }}"
+            - name: GITLAB_FORCE_SSL
+              value: "{{ .Values.config.smtp_force_ssl }}"
+            - name: GITLAB_EMAIL_FROM
+              value: "{{ .Values.config.email_from }}"
+            - name: GITLAB_EMAIL_DISPLAY_NAME
+              value: "{{ .Values.config.email_display_name }}"
+            - name: GITLAB_EMAIL_REPLY_TO
+              value: "{{ .Values.config.email_reply_to }}"
+            - name: GITLAB_PROMETHEUS_ENABLE
+              value: "{{ .Values.config.prometheus_monitoring_enable }}"
+            - name: GITLAB_DATABASE_ADAPTER
+              value: "{{ .Values.config.database_adapter }}"
+            - name: GITLAB_DATABASE_ENCODING
+              value: "{{ .Values.config.database_encoding }}"
+            - name: GITLAB_DATABASE_NAME
+              value: "{{ .Values.config.database_name }}"
+            - name: GITLAB_DATABASE_USERNAME
+              value: "{{ .Values.config.database_username }}"
+            - name: GITLAB_DATABASE_PASSWORD
+              value: "{{ .Values.config.database_password }}"
+            - name: GITLAB_DATABASE_POOL
+              value: "{{ .Values.config.database_pool }}"
+            - name: GITLAB_DATABASE_HOST
+              value: "{{ .Values.config.database_host }}"
+            - name: GITLAB_DATABASE_PORT
+              value: "{{ .Values.config.database_port }}"
+            - name: GITLAB_OMNIBUS_CONFIG
+              value: |
+                external_url "#{ENV['GITLAB_EXTERNAL_URL']}"
+                pages_external_url "#{ENV['GITLAB_PAGES_EXTERNAL_URL']}"
+
+                nginx['listen_port'] = ENV['GITLAB_NGINX_LISTEN_PORT']
+                nginx['listen_https'] = ENV['GITLAB_NGINX_LISTEN_HTTPS']
+                nginx['proxy_set_headers'] = { "X-Forwarded-Proto" => "https", "X-Forwarded-Ssl" => "on" }
+                nginx['redirect_http_to_https'] = false
+                nginx['listen_https'] = false
+
+                # Web server
+                web_server['external_users'] = ['nginx','gitlab-www','git']
+                web_server['username'] = 'git'
+                web_server['group'] = 'git'
+
+                # SMTP and email details
+                gitlab_rails['smtp_enable'] = ENV['GITLAB_SMTP_ENABLE']
+                gitlab_rails['smtp_address'] = ENV['GITLAB_SMTP_ADDRESS']
+                gitlab_rails['smtp_port'] = ENV['GITLAB_SMTP_PORT']
+                gitlab_rails['smtp_authentication'] = ENV['GITLAB_SMTP_AUTH']
+                gitlab_rails['smtp_enable_starttls_auto'] = ENV['GITLAB_SMTP_ENABLE_STARTTLS']
+                gitlab_rails['smtp_ssl'] = ENV['GITLAB_SMTP_SSL']
+                gitlab_rails['smtp_force_ssl'] = ENV['GITLAB_FORCE_SSL']
+                gitlab_rails['gitlab_email_from'] = ENV['GITLAB_EMAIL_FROM']
+                gitlab_rails['gitlab_email_display_name'] = ENV['GITLAB_EMAIL_DISPLAY_NAME']
+                gitlab_rails['gitlab_email_reply_to'] = ENV['GITLAB_EMAIL_REPLY_TO']
+
+                prometheus_monitoring['enable'] = ENV['GITLAB_PROMETHEUS_ENABLE']
+
+                # Redis (use bundled Redis)
+                redis['enable'] = true
+
+                # Unicorn
+                unicorn['listen'] = '0.0.0.0'
+                unicorn['worker_timeout'] = 120
+                unicorn['worker_processes'] = 2
+
+                # Pages
+                gitlab_pages['inplace_chroot'] = true
+
+                # Postgres (disable the built-in Postgres)
+                postgresql['enable'] = false
+                postgresql['ssl'] = 'off'
+
+                # Details for external database connection
+                gitlab_rails['db_adapter'] = ENV['GITLAB_DATABASE_ADAPTER']
+                gitlab_rails['db_host'] = ENV['GITLAB_DATABASE_HOST']
+                gitlab_rails['db_port'] = ENV['GITLAB_DATABASE_PORT']
+                gitlab_rails['db_pool'] = ENV['GITLAB_DATABASE_POOL']
+                gitlab_rails['db_encoding'] = ENV['GITLAB_DATABASE_ENCODING']
+                gitlab_rails['db_database'] = ENV['GITLAB_DATABASE_NAME']
+                gitlab_rails['db_username'] = ENV['GITLAB_DATABASE_USERNAME']
+                gitlab_rails['db_password'] = ENV['GITLAB_DATABASE_PASSWORD']
+
+                # Disable Prometheus
+                prometheus['monitor_kubernetes'] = false
+
+                # Health check
+                gitlab_rails['monitoring_whitelist'] = ['0.0.0.0/0']
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: ssh
+              containerPort: 22
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /-/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 60
+            timeoutSeconds: 30
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+              - gitlab-ctl
+              - status
+            initialDelaySeconds: 60
+            periodSeconds: 60
+            timeoutSeconds: 30
+            successThreshold: 1
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: 2
+              memory: 3Gi
+            requests:
+              cpu: 10m
+              memory: 2Gi
+          volumeMounts:
+            - name: gitlab-server
+              mountPath: /etc/gitlab
+              subPath: gitlab-config
+            - name: gitlab-server
+              mountPath: /var/opt/gitlab
+              subPath: gitlab-data
+            - name: gitlab-server
+              mountPath: /var/log/gitlab
+              subPath: gitlab-logs
+            - name: gitlab-server
+              mountPath: /etc/ssl
+              subPath: gitlab-ssl     
+      volumes:
+        - name: gitlab-server
+          persistentVolumeClaim:
+            claimName: gitlab-server

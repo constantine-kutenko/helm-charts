@@ -1,0 +1,37 @@
+registry_address: registry.example.com
+revisionHistoryLimit: 3
+
+jira:
+  replicaCount: 1
+  image:
+    name: jira-software
+    pullPolicy: Always
+  env:
+    JIRA_DATABASE_TYPE: "postgresql"
+    JIRA_DATABASE_NAME: "jira"
+    JIRA_DATABASE_USER: "jira"
+    JIRA_DATABASE_PASSWORD: ""
+    JIRA_DATABASE_SCHEMA: "public"
+    TOMCAT_PROXY_ENABLED: ""
+    TOMCAT_PROXY_NAME: ""
+    TOMCAT_PROXY_PORT: ""
+    TOMCAT_PROXY_SCHEME: ""
+    JIRA_JAVA_XMS: ""
+    JIRA_JAVA_XMX: ""
+  service:
+    type: ClusterIP
+    protocol: TCP
+  ingress:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: traefik
+      ingress.kubernetes.io/redirect-entry-point: https
+      ingress.kubernetes.io/redirect-permanent: "true"
+    path: /
+    hosts:
+      - localhost
+
+# Dependencies
+postgresql:
+  postgresql:
+    matchExpressionKey: "kubernetes.io/jira-database"

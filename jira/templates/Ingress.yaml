@@ -1,0 +1,23 @@
+---
+{{- if .Values.jira.ingress.enabled -}}
+{{- $ingressPath := .Values.jira.ingress.path -}}
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ .Chart.Name }}
+{{- with .Values.jira.ingress.annotations }}
+  annotations:
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  rules:
+  {{- range .Values.jira.ingress.hosts }}
+    - host: {{ . }}
+      http:
+        paths:
+          - path: {{ $ingressPath }}
+            backend:
+              serviceName: jira
+              servicePort: http
+  {{- end }}
+{{- end }}

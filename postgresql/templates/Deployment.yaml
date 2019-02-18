@@ -1,0 +1,49 @@
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-{{ .Chart.Name }}"
+  labels:
+    app: "{{ .Release.Name }}"
+spec:
+  replicas: {{ .Values.postgresql.replicaCount }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}"
+  template:
+    metadata:
+      labels:
+        app: "{{ .Release.Name }}"
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: {{ .Values.postgresql.matchExpressionKey }}
+                  operator: In
+                  values: ["true"]
+      strategy:
+        type: Recreate
+      containers:
+        - name: postgresql
+          image: "{{ .Values.registry_address }}/{{ .Values.postgresql.image.name }}:{{ .Values.postgresql.image.tag }}"
+          imagePullPolicy: {{ .Values.postgresql.image.pullPolicy }}
+          ports:
+            - name: postgres
+              containerPort: {{ .Values.postgresql.service.port }}
+              protocol: TCP
+          volumeMounts:
+            - name: postgresql-data
+              mountPath: '{{ .Values.postgresql.storage.mountPath }}'
+          livenessProbe:
+            tcpSocket: 
+              port: {{ .Values.postgresql.service.port }}
+            initialDelaySeconds: 60
+            periodSeconds: 60
+            failureThreshold: 5
+      volumes:
+        - name: postgresql-data
+          hostPath:
+            path: '{{ .Values.postgresql.volumes.path }}'

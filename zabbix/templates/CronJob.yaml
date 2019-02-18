@@ -1,0 +1,39 @@
+---
+
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: zabbix-database-backup
+spec:
+  concurrencyPolicy: {{ .Values.job.concurrencyPolicy }}
+  failedJobsHistoryLimit: {{ .Values.job.failedJobsHistoryLimit }}
+  schedule: "{{ .Values.job.schedule }}"
+  successfulJobsHistoryLimit: {{ .Values.job.successfulJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: zabbix
+            cron: zabbix-database-backup
+        spec:
+          restartPolicy: {{ .Values.job.restartPolicy }}
+          containers:
+            - name: zabbix-database-backup
+              image: "{{ .Values.registry_address }}/{{ .Values.job.image.name }}:{{ .Values.job.image.tag }}"
+              imagePullPolicy: {{ .Values.job.image.pullPolicy }}
+              env:
+                - name: PGDUMP_DATABASE_NAME
+                  value: "{{ .Values.env.ZABBIX_DATABASE_NAME }}"
+                - name: PGDUMP_DATABASE_USER
+                  value: "{{ .Values.env.ZABBIX_DATABASE_USER }}"
+                - name: PGDUMP_DATABASE_PASSWORD
+                  value: "{{ .Values.env.ZABBIX_DATABASE_PASSWORD }}"
+                - name: PGDUMP_BACKUP_SERVER_ADDRESS
+                  value: "{{ .Values.env.PGDUMP_BACKUP_SERVER_ADDRESS }}"
+                - name: PGDUMP_BACKUP_SERVER_BUCKET_NAME
+                  value: "{{ .Values.env.PGDUMP_BACKUP_SERVER_BUCKET_NAME }}"
+                - name: PGDUMP_BACKUP_SERVER_ACCESS_KEY
+                  value: "{{ .Values.env.PGDUMP_BACKUP_SERVER_ACCESS_KEY }}"
+                - name: PGDUMP_BACKUP_SERVER_SECRET_KEY
+                  value: "{{ .Values.env.PGDUMP_BACKUP_SERVER_SECRET_KEY }}"

@@ -1,0 +1,37 @@
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab-server-web
+  labels:
+    app: gitlab-server
+    tier: server
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: gitlab-server
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab-server-ssh
+  labels:
+    app: gitlab-server
+    tier: server
+spec:
+  externalTrafficPolicy: Cluster
+  ports:
+  - name: ssh
+    nodePort: 31746
+    port: 22
+    protocol: TCP
+    targetPort: 22
+  selector:
+    app: gitlab-server
+  type: NodePort

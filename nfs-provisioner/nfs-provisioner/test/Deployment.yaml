@@ -1,0 +1,42 @@
+---
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nfs-consumer
+  namespace: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-consumer
+  template:
+    metadata:
+      labels:
+        app: nfs-consumer
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+        - name: nfs-consumer
+          image: alpine:latest
+          command:
+            - "/bin/sh"
+          args:
+            - "-c"
+            - "tail"
+            - "-f"
+            - "/dev/null"
+          resources:
+            limits:
+              cpu: "50m"
+              memory: "20Mi"
+            requests:
+              cpu: "10m"
+              memory: "10Mi"
+          volumeMounts:
+            - name: nfs
+              mountPath: /mnt
+      volumes:
+        - name: nfs
+          persistentVolumeClaim:
+            claimName: nfs-test-volume
